@@ -1,17 +1,11 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>blinker</name>
+  <name>master_launch</name>
   <version>1.0.0</version>
-  <description>Package that blinks LEDs of Duckiebot</description>
+  <description>Master launch of the joystick</description>
   <maintainer email="ilia.nechaev@jetbrains.com">Ilia Nechaev</maintainer>
-  <maintainer email="lankford@mit.edu">Gage Lankford</maintainer>
-  <maintainer email="apados@mit.edu">Artemis Pados</maintainer>
-  <license>GPLv3</license>
-
-  <depend>std_msgs</depend>
-  <depend>rclpy</depend>
-
+  <license>MIT</license>
   <export>
     <build_type>ament_python</build_type>
   </export>
