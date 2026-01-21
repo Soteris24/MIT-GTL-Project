@@ -15,16 +15,21 @@ class SkeletonNode(Node):
         self.vehicle_name = os.getenv('VEHICLE_NAME')
         self.tof_sub = self.create_subscription(Range, f'/{self.vehicle_name}/range', self.check_range, 10)
         self.wheel_pub = self.create_publisher(WheelsCmdStamped, f'/{self.vehicle_name}/wheels_cmd', 10)
-        # self.timer = self.create_timer(0.1, self.move_forward_callback)
-        # self.get_logger().info('Forward')
+
+        # State machine for obstacle avoidance
+        # States: 'normal', 'avoiding_turn_right', 'avoiding_forward', 'avoiding_turn_left'
+        self.state = 'normal'
+        self.avoidance_timer = None
 
 
     def check_range(self, msg):
         distance = msg.range
-        if distance >= 0.1:
-            self.move_forward()
-        else:
-            self.stop()
+        # Only respond to sensor when in normal state
+        if self.state == 'normal':
+            if distance >= 0.1:
+                self.move_forward()
+            else:
+                self.start_avoidance()
 
     
     def move_forward(self):
@@ -32,6 +37,38 @@ class SkeletonNode(Node):
 
     def stop(self):
         self.run_wheels('stop_callback', 0.0, 0.0)
+
+    def start_avoidance(self):
+        """Start the obstacle avoidance maneuver"""
+        self.get_logger().info('Obstacle detected! Starting avoidance maneuver...')
+        self.state = 'avoiding_turn_right'
+        self.stop()
+        # Step 1: Turn right (left wheel only) for 1 second
+        self.run_wheels('turn_right', 0.5, 0.0)
+        self.avoidance_timer = self.create_timer(1.0, self.avoidance_step_forward)
+
+    def avoidance_step_forward(self):
+        """Step 2: Go forward for 2 seconds"""
+        self.avoidance_timer.cancel()
+        self.get_logger().info('Going forward...')
+        self.state = 'avoiding_forward'
+        self.run_wheels('avoidance_forward', 0.5, 0.5)
+        self.avoidance_timer = self.create_timer(2.0, self.avoidance_step_turn_left)
+
+    def avoidance_step_turn_left(self):
+        """Step 3: Turn left (right wheel only) for 1 second"""
+        self.avoidance_timer.cancel()
+        self.get_logger().info('Turning left...')
+        self.state = 'avoiding_turn_left'
+        self.run_wheels('turn_left', 0.0, 0.5)
+        self.avoidance_timer = self.create_timer(1.0, self.avoidance_complete)
+
+    def avoidance_complete(self):
+        """Avoidance maneuver complete, resume normal operation"""
+        self.avoidance_timer.cancel()
+        self.get_logger().info('Avoidance complete, resuming normal operation.')
+        self.state = 'normal'
+        self.move_forward()
 
     def run_wheels(self, frame_id, vel_left, vel_right):
         wheel_msg = WheelsCmdStamped()
