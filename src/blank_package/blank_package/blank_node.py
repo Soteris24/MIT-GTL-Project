@@ -42,13 +42,13 @@ class SkeletonNode(Node):
 
     
     def move_forward(self):
-        self.run_wheels('forward_callback', 0.5, 0.5)
+        self.run_wheels('forward_callback', 0.2, 0.2)
 
     def turn_left(self):
-        self.run_wheels('left_callback', -0.5, 0.5)
+        self.run_wheels('left_callback', -0.2, 0.2)
 
     def turn_right(self):
-        self.run_wheels('right_callback', 0.5, -0.5)
+        self.run_wheels('right_callback', 0.2, -0.2)
 
     def stop(self):
         self.run_wheels('stop_callback', 0.0, 0.0)
@@ -60,7 +60,7 @@ class SkeletonNode(Node):
         self.stop()
         # Step 1: Turn right (left wheel only) for 1 second
         self.turn_right()
-        self.avoidance_timer = self.create_timer(1.0, self.avoidance_step_forward)
+        self.avoidance_timer = self.create_timer(0.5, self.avoidance_step_forward)
 
     def avoidance_step_forward(self):
         """Step 2: Go forward for 2 seconds"""
@@ -76,7 +76,7 @@ class SkeletonNode(Node):
         self.get_logger().info('Turning left...')
         self.state = 'avoiding_turn_left'
         self.turn_left()
-        self.avoidance_timer = self.create_timer(1.0, self.avoidance_complete)
+        self.avoidance_timer = self.create_timer(0.5, self.avoidance_complete)
 
     def avoidance_complete(self):
         """Avoidance maneuver complete, resume normal operation"""
@@ -121,6 +121,7 @@ def main():
     except KeyboardInterrupt:
         pass
     finally:
+        node.stop() 
         node.destroy_node()
         rclpy.shutdown()
 
