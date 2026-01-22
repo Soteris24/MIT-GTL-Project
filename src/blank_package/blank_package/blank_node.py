@@ -185,8 +185,11 @@ class SkeletonNode(Node):
         angle_diff = self.normalize_angle(self.target_yaw - self.current_yaw)
         angle_diff_degrees = abs(math.degrees(angle_diff))
         
-        # Tolerance of 5 degrees
-        ANGLE_TOLERANCE = 5.0
+        # Debug: print current progress
+        print(f'Turn progress: Current={math.degrees(self.current_yaw):.1f}°, Target={math.degrees(self.target_yaw):.1f}°, Diff={angle_diff_degrees:.1f}°')
+        
+        # Tolerance of 10 degrees (increased for better completion detection)
+        ANGLE_TOLERANCE = 10.0
         
         if angle_diff_degrees < ANGLE_TOLERANCE:
             print(f'Turn complete! Current yaw: {math.degrees(self.current_yaw):.1f}°')
@@ -198,13 +201,13 @@ class SkeletonNode(Node):
                 self.turn_check_timer = None
     
     def move_forward(self):
-        self.run_wheels('forward_callback', 0.5, 0.5)
+        self.run_wheels('forward_callback', 0.2, 0.2)
 
     def turn_left(self):
-        self.run_wheels('left_callback', -0.5, 0.5)
+        self.run_wheels('left_callback', -0.2, 0.2)
 
     def turn_right(self):
-        self.run_wheels('right_callback', 0.5, -0.5)
+        self.run_wheels('right_callback', 0.2, -0.2)
 
     def stop(self):
         self.run_wheels('stop_callback', 0.0, 0.0)
