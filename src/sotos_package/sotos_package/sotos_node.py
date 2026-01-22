@@ -41,7 +41,7 @@ class EncoderAvoidanceNode(Node):
         self.NORMAL_SPEED = 20 # Speed in normal mode
         self.TOLERANCE = 10 # Arrival tolerance
         
-        # 1. NEW: Max speed variable to limit velocity
+        
         self.MAX_SPEED = 0.6      
 
         self.create_timer(0.1, self.control_loop)
@@ -79,7 +79,7 @@ class EncoderAvoidanceNode(Node):
                 self.get_logger().info("Normal Op")
                 self.state = State.NORMAL
                 
-                # Reset targets to current so we don't jump
+               
                 self.target_left = self.left_ticks
                 self.target_right = self.right_ticks
 
