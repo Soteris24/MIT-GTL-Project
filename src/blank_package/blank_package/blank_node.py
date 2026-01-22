@@ -23,9 +23,9 @@ class SkeletonNode(Node):
         print(f'Publishing to: /{self.vehicle_name}/wheels_cmd')
         print(f'========================================')
 
-        # QoS for sensor data (BEST_EFFORT to match typical sensor publishers)
+        # QoS for sensor data (RELIABLE to match tof_driver_node publisher)
         sensor_qos = QoSProfile(
-            reliability=ReliabilityPolicy.BEST_EFFORT,
+            reliability=ReliabilityPolicy.RELIABLE,
             history=HistoryPolicy.KEEP_LAST,
             depth=10
         )
