@@ -149,6 +149,8 @@ class SkeletonNode(Node):
         self.avoidance_timer.cancel()
         self.get_logger().info('Avoidance complete, resuming normal operation.')
         self.set_leds_green()
+        # Reset target to current encoder position so we start fresh
+        self.target_ticks = max(self.left_ticks, self.right_ticks)
         self.state = 'normal'
 
     def run_wheels(self, frame_id, vel_left, vel_right):
