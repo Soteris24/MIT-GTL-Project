@@ -13,6 +13,14 @@ class SkeletonNode(Node):
         super().__init__('blank_node')
         #Create publishers and subscribers in init, use callback
         self.vehicle_name = os.getenv('VEHICLE_NAME')
+
+        # DEBUG: Print startup info
+        print(f'========================================')
+        print(f'VEHICLE_NAME: {self.vehicle_name}')
+        print(f'Subscribing to: /{self.vehicle_name}/range')
+        print(f'Publishing to: /{self.vehicle_name}/wheels_cmd')
+        print(f'========================================')
+
         self.tof_sub = self.create_subscription(Range, f'/{self.vehicle_name}/range', self.check_range, 10)
         self.wheel_pub = self.create_publisher(WheelsCmdStamped, f'/{self.vehicle_name}/wheels_cmd', 10)
         self.led_pub = self.create_publisher(LEDPattern, f'/{self.vehicle_name}/led_pattern', 1)  
@@ -43,17 +51,20 @@ class SkeletonNode(Node):
         # error calculation
         left_error = self.target_ticks - self.left_ticks
         right_error = self.target_ticks - self.right_ticks
-    
+
         kp = 0.005
-    
+
         # Speed calculation
         left_speed = 0.5 + (kp * left_error)
         right_speed = 0.5 + (kp * right_error)
-    
+
         # Limits
         left_speed = max(0.0, min(1.0, left_speed))
         right_speed = max(0.0, min(1.0, right_speed))
-    
+
+        # DEBUG: Print calculated speeds
+        print(f'Target: {self.target_ticks} | L_ticks: {self.left_ticks} | R_ticks: {self.right_ticks} | L_speed: {left_speed:.2f} | R_speed: {right_speed:.2f}')
+
         self.run_wheels('target_tracking', left_speed, right_speed)
 
     def tick_callback(self, msg):
@@ -67,6 +78,9 @@ class SkeletonNode(Node):
 
     def check_range(self, msg):
         distance = msg.range
+        # DEBUG: Print every ToF reading (comment out after testing)
+        print(f'ToF reading: {distance:.3f}m | State: {self.state}')
+
         if self.state == 'normal':
             if distance < 0.1 and distance > 0.02:
                 self.start_avoidance()
