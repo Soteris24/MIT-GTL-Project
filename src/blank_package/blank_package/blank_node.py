@@ -26,10 +26,14 @@ class SkeletonNode(Node):
         #Encoder ticks
         self.left_ticks = 0
         self.right_ticks = 0
-        self.target_ticks = 0
+        self.target_ticks = 100
 
         self.target_timer = self.create_timer(1.0, self.increment_target)
+        self.control_timer = self.create_timer(0.1, self.control_loop)  # 10Hz control loop
 
+    def control_loop(self):
+        if self.state == 'normal':
+            self.adjust_with_target()
 
     def increment_target(self):
         self.target_ticks += 100
@@ -61,16 +65,10 @@ class SkeletonNode(Node):
             self.right_ticks = msg.data
             self.get_logger().info(f'Right ticks: {self.right_ticks}')
 
-        if self.state == 'normal':
-            self.adjust_with_target()
-
     def check_range(self, msg):
         distance = msg.range
-        # Only respond to sensor when in normal state
         if self.state == 'normal':
-            if distance >= 0.1:
-                self.adjust_with_target()
-            elif distance > 0.02:  # Must be > 2cm to be a real obstacle
+            if distance < 0.1 and distance > 0.02:
                 self.start_avoidance()
 
     def avoidWall(self, msg):
@@ -93,11 +91,10 @@ class SkeletonNode(Node):
         self.run_wheels('stop_callback', 0.0, 0.0)
 
     def start_avoidance(self):
-        """Start the obstacle avoidance maneuver"""
         self.get_logger().info('Obstacle detected! Starting avoidance maneuver...')
         self.set_leds_red()    # Turn the LEDS RED
         self.state = 'avoiding_turn_right'
-        self.stop()
+        #self.stop()
         # Step 1: Turn right (left wheel only) for 1 second
         self.turn_right()
         self.avoidance_timer = self.create_timer(0.5, self.avoidance_step_forward)
@@ -120,12 +117,10 @@ class SkeletonNode(Node):
         self.avoidance_timer = self.create_timer(0.5, self.avoidance_complete)
 
     def avoidance_complete(self):
-        """Avoidance maneuver complete, resume normal operation"""
         self.avoidance_timer.cancel()
         self.get_logger().info('Avoidance complete, resuming normal operation.')
         self.set_leds_green()
         self.state = 'normal'
-        self.move_forward()
 
     def run_wheels(self, frame_id, vel_left, vel_right):
         wheel_msg = WheelsCmdStamped()
