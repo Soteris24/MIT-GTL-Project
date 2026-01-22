@@ -3,35 +3,11 @@ import os
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
-import math
 
 # Fill in something for msg type imports
 from std_msgs.msg import Header, ColorRGBA
-from sensor_msgs.msg import Range, Imu
+from sensor_msgs.msg import Range
 from duckietown_msgs.msg import WheelsCmdStamped, LEDPattern, WheelEncoderStamped
-
-
-def euler_from_quaternion(x, y, z, w):
-    """
-    Convert a quaternion into euler angles (roll, pitch, yaw)
-    roll is rotation around x in radians (counterclockwise)
-    pitch is rotation around y in radians (counterclockwise)
-    yaw is rotation around z in radians (counterclockwise)
-    """
-    t0 = +2.0 * (w * x + y * z)
-    t1 = +1.0 - 2.0 * (x * x + y * y)
-    roll_x = math.atan2(t0, t1)
-    
-    t2 = +2.0 * (w * y - z * x)
-    t2 = +1.0 if t2 > +1.0 else t2
-    t2 = -1.0 if t2 < -1.0 else t2
-    pitch_y = math.asin(t2)
-    
-    t3 = +2.0 * (w * z + x * y)
-    t4 = +1.0 - 2.0 * (y * y + z * z)
-    yaw_z = math.atan2(t3, t4)
-    
-    return roll_x, pitch_y, yaw_z
 
 
 class SkeletonNode(Node):
@@ -44,7 +20,6 @@ class SkeletonNode(Node):
         print(f'========================================')
         print(f'VEHICLE_NAME: {self.vehicle_name}')
         print(f'Subscribing to: /{self.vehicle_name}/range')
-        print(f'Subscribing to: /{self.vehicle_name}/imu_data')
         print(f'Publishing to: /{self.vehicle_name}/wheels_cmd')
         print(f'========================================')
 
@@ -55,20 +30,14 @@ class SkeletonNode(Node):
             depth=10
         )
         self.tof_sub = self.create_subscription(Range, f'/{self.vehicle_name}/range', self.check_range, sensor_qos)
-        self.imu_sub = self.create_subscription(Imu, f'/{self.vehicle_name}/imu_data', self.imu_callback, sensor_qos)
         self.wheel_pub = self.create_publisher(WheelsCmdStamped, f'/{self.vehicle_name}/wheels_cmd', 10)
         self.led_pub = self.create_publisher(LEDPattern, f'/{self.vehicle_name}/led_pattern', 1)  
         self.tick_sub = self.create_subscription(WheelEncoderStamped,f'/{self.vehicle_name}/tick',self.tick_callback,10)
-        
-        # IMU data
-        self.current_yaw = 0.0
-        self.target_yaw = None
-        self.turn_complete = False
-        
         # State machine for obstacle avoidance
         # States: 'normal', 'avoiding_turn_right', 'avoiding_forward', 'avoiding_turn_left'
         self.state = 'normal'
         self.avoidance_timer = None
+        
         
         #Encoder ticks
         self.left_ticks = 0
@@ -78,22 +47,6 @@ class SkeletonNode(Node):
 
         self.target_timer = self.create_timer(1.0, self.increment_target)
         self.control_timer = self.create_timer(0.1, self.control_loop)  # 10Hz control loop
-        
-        # Timer for checking turn completion
-        self.turn_check_timer = None
-
-    def imu_callback(self, msg):
-        """Extract yaw angle from IMU quaternion"""
-        orientation_q = msg.orientation
-        (roll, pitch, yaw) = euler_from_quaternion(
-            orientation_q.x,
-            orientation_q.y,
-            orientation_q.z,
-            orientation_q.w
-        )
-        self.current_yaw = yaw
-        # DEBUG: Uncomment to see yaw updates
-        # print(f'Current yaw: {math.degrees(self.current_yaw):.1f}°')
 
     def control_loop(self):
         if self.state == 'normal':
@@ -140,65 +93,12 @@ class SkeletonNode(Node):
             if distance < 0.1 and distance > 0.02:
                 self.start_avoidance()
 
-    def normalize_angle(self, angle):
-        """Normalize angle to [-pi, pi]"""
-        while angle > math.pi:
-            angle -= 2.0 * math.pi
-        while angle < -math.pi:
-            angle += 2.0 * math.pi
-        return angle
-
-    def turn_to_angle(self, target_angle_degrees, turn_direction='right'):
-        """
-        Turn the robot to a specific angle relative to current orientation
-        target_angle_degrees: degrees to turn (e.g., 90)
-        turn_direction: 'right' or 'left'
-        """
-        # Convert to radians
-        angle_to_turn = math.radians(target_angle_degrees)
-        
-        # Calculate target yaw
-        if turn_direction == 'right':
-            self.target_yaw = self.normalize_angle(self.current_yaw - angle_to_turn)
-        else:  # left
-            self.target_yaw = self.normalize_angle(self.current_yaw + angle_to_turn)
-        
-        self.turn_complete = False
-        
-        print(f'Starting turn: Current={math.degrees(self.current_yaw):.1f}°, Target={math.degrees(self.target_yaw):.1f}°')
-        
-        # Start turning
-        if turn_direction == 'right':
-            self.turn_right()
+    def avoidWall(self, msg):
+        distance = msg.range
+        if distance >= 0.1:
+            self.move_forward()
         else:
-            self.turn_left()
-        
-        # Create timer to check if turn is complete
-        self.turn_check_timer = self.create_timer(0.05, lambda: self.check_turn_complete(turn_direction))
-
-    def check_turn_complete(self, turn_direction):
-        """Check if the robot has reached the target yaw angle"""
-        if self.target_yaw is None:
-            return
-        
-        # Calculate angular difference
-        angle_diff = self.normalize_angle(self.target_yaw - self.current_yaw)
-        angle_diff_degrees = abs(math.degrees(angle_diff))
-        
-        # Debug: print current progress
-        print(f'Turn progress: Current={math.degrees(self.current_yaw):.1f}°, Target={math.degrees(self.target_yaw):.1f}°, Diff={angle_diff_degrees:.1f}°')
-        
-        # Tolerance of 10 degrees (increased for better completion detection)
-        ANGLE_TOLERANCE = 10.0
-        
-        if angle_diff_degrees < ANGLE_TOLERANCE:
-            print(f'Turn complete! Current yaw: {math.degrees(self.current_yaw):.1f}°')
-            self.stop()
-            self.turn_complete = True
-            self.target_yaw = None
-            if self.turn_check_timer:
-                self.turn_check_timer.cancel()
-                self.turn_check_timer = None
+            self.start_avoidance() 
     
     def move_forward(self):
         self.run_wheels('forward_callback', 0.2, 0.2)
@@ -217,21 +117,13 @@ class SkeletonNode(Node):
         self.set_leds_red()    # Turn the LEDS RED
         self.state = 'avoiding_turn_right'
         self.stop()
-        
-        # Step 1: Turn right 90 degrees using IMU
-        self.turn_to_angle(90, 'right')
-        
-        # Wait for turn to complete, then move forward
-        self.avoidance_timer = self.create_timer(0.1, self.wait_for_turn_right)
-
-    def wait_for_turn_right(self):
-        """Wait for right turn to complete, then move forward"""
-        if self.turn_complete:
-            self.avoidance_timer.cancel()
-            self.avoidance_step_forward()
+        # Step 1: Turn right (left wheel only) for 1 second
+        self.turn_right()
+        self.avoidance_timer = self.create_timer(0.5, self.avoidance_step_forward)
 
     def avoidance_step_forward(self):
         """Step 2: Go forward for 2 seconds"""
+        self.avoidance_timer.cancel()
         self.get_logger().info('Going forward...')
         self.set_leds_yellow() # Turn the LEDs yellow when it is in the process of avoiding
         self.state = 'avoiding_forward'
@@ -239,24 +131,15 @@ class SkeletonNode(Node):
         self.avoidance_timer = self.create_timer(2.0, self.avoidance_step_turn_left)
 
     def avoidance_step_turn_left(self):
-        """Step 3: Turn left 90 degrees using IMU"""
+        """Step 3: Turn left (right wheel only) for 1 second"""
         self.avoidance_timer.cancel()
         self.get_logger().info('Turning left...')
         self.state = 'avoiding_turn_left'
-        
-        # Turn left 90 degrees
-        self.turn_to_angle(90, 'left')
-        
-        # Wait for turn to complete, then finish
-        self.avoidance_timer = self.create_timer(0.1, self.wait_for_turn_left)
-
-    def wait_for_turn_left(self):
-        """Wait for left turn to complete, then finish avoidance"""
-        if self.turn_complete:
-            self.avoidance_timer.cancel()
-            self.avoidance_complete()
+        self.turn_left()
+        self.avoidance_timer = self.create_timer(0.5, self.avoidance_complete)
 
     def avoidance_complete(self):
+        self.avoidance_timer.cancel()
         self.get_logger().info('Avoidance complete, resuming normal operation.')
         self.set_leds_green()
         # Reset target to current encoder position so we start fresh
@@ -290,6 +173,21 @@ class SkeletonNode(Node):
         pattern = ColorRGBA(r=1.0, g=1.0, b=0.0, a=1.0)
         msg.rgb_vals = [pattern] * 5
         self.led_pub.publish(msg)
+
+
+    # def move_forward_callback(self):
+    #     # Create the wheel command message
+    #     msg = WheelsCmdStamped()
+    #     msg.header.stamp = self.get_clock().now().to_msg()
+        
+
+    #     msg.vel_left = 0.3  
+    #     msg.vel_right = 0.3
+        
+    #     # Publish
+    #     self.wheel_pub.publish(msg)
+    #     self.get_logger().info(f'Publishing: left={msg.vel_left}, right={msg.vel_right}')
+    
 
 
 def main():
