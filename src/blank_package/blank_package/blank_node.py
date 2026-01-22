@@ -36,12 +36,17 @@ class SkeletonNode(Node):
         self.get_logger().info(f'New target: {self.target_ticks}')
 
     def adjust_with_target(self):
-    # Error
+        # error calculation
         left_error = self.target_ticks - self.left_ticks
         right_error = self.target_ticks - self.right_ticks
     
         kp = 0.005
-
+    
+        # Speed calculation
+        left_speed = 0.5 + (kp * left_error)
+        right_speed = 0.5 + (kp * right_error)
+    
+        # Limits
         left_speed = max(0.0, min(1.0, left_speed))
         right_speed = max(0.0, min(1.0, right_speed))
     
@@ -56,12 +61,15 @@ class SkeletonNode(Node):
             self.right_ticks = msg.data
             self.get_logger().info(f'Right ticks: {self.right_ticks}')
 
+        if self.state == 'normal':
+            self.adjust_with_target()
+
     def check_range(self, msg):
         distance = msg.range
         # Only respond to sensor when in normal state
         if self.state == 'normal':
             if distance >= 0.1:
-                self.move_forward()
+                self.adjust_with_target()
             elif distance > 0.02:  # Must be > 2cm to be a real obstacle
                 self.start_avoidance()
 
