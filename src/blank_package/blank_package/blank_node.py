@@ -101,13 +101,13 @@ class SkeletonNode(Node):
             self.start_avoidance() 
     
     def move_forward(self):
-        self.run_wheels('forward_callback', 0.2, 0.2)
+        self.run_wheels('forward_callback', 0.5, 0.5)
 
     def turn_left(self):
-        self.run_wheels('left_callback', -0.2, 0.2)
+        self.run_wheels('left_callback', -0.5, 0.5)
 
     def turn_right(self):
-        self.run_wheels('right_callback', 0.2, -0.2)
+        self.run_wheels('right_callback', 0.5, -0.5)
 
     def stop(self):
         self.run_wheels('stop_callback', 0.0, 0.0)
