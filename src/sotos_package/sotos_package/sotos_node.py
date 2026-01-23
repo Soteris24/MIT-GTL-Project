@@ -36,15 +36,15 @@ class EncoderAvoidanceNode(Node):
         self.initialized = False
 
         # Config
-        self.TURN_TICKS = 110 # Ticks to turn 
+        self.TURN_TICKS = 100 # Ticks to turn 
         self.DRIVE_TICKS = 400 # Ticks to drive forward
-        self.NORMAL_SPEED = 20 # Speed in normal mode
+        self.NORMAL_SPEED = 10 # Speed in normal mode
         self.TOLERANCE = 3 # Arrival tolerance
         
         
-        self.MAX_SPEED = 0.6      
+        self.MAX_SPEED = 0.5    
 
-        self.create_timer(0.1, self.control_loop)
+        self.create_timer(0.05, self.control_loop)
 
     def control_loop(self):
         if not self.initialized: return
